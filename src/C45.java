@@ -11,12 +11,21 @@ public class C45<A, T, C> {
 	private ArrayList<C> catagories = new ArrayList<C>();
 	private ArrayList<ArrayList> atributes = new ArrayList<ArrayList>();
 	private ArrayList<T> atributeLables = new ArrayList<T>();
+	private double threshold = 0.0;
 	
+	public double getThreshold() {
+		return threshold;
+	}
+
+	public void setThreshold(double threshold) {
+		this.threshold = threshold;
+	}
+
 	public void add(Vector<A> a, C c){
 		allData.add(new C45Data(a,c));
 	}
 	
-	public void setAtribuuteLables(ArrayList<T> a){
+	public void setAtributeLables(ArrayList<T> a){
 		atributeLables = a;		
 	}
 	
@@ -25,9 +34,30 @@ public class C45<A, T, C> {
 		buildAtrCount(allData);
 		//System.out.println(entropyOnRow(0, allData));
 		//System.out.println(chooseAtrib(allData));
-		head = addTree(allData, atributeLables);
-
+		head = addTree(allData, (ArrayList<T>) atributeLables.clone(),(ArrayList<ArrayList>) atributes.clone());
 		return head;
+	}
+	
+	public C clasify(Vector<A> data){
+		C45Data d = new C45Data(data, null);
+		return clasifyRecurse(d, head).classified;		
+	}
+	
+	public Node clasifyRecurse(C45Data data, Node n){
+		
+		if (n.classified != null){
+			return n;
+		} else {
+			T attrib = n.atribute;
+			int i = atributeLables.indexOf(attrib);
+			A val = data.atributes.get(i);
+			
+			return clasifyRecurse(data, n.edges.get(val));
+			
+			
+			
+		}
+		
 	}
 	
 	private void buildCaragories(ArrayList<C45Data> data){
@@ -70,7 +100,7 @@ public class C45<A, T, C> {
 		return true;
 	}
 	
-	public Node addTree(ArrayList<C45Data> data, ArrayList<T> aLabels){
+	public Node addTree(ArrayList<C45Data> data, ArrayList<T> aLabels, ArrayList<ArrayList> attr){
 		//check for termination
 		if (aLabels.size() == 0){
 			return new Node(getConcensus(data));
@@ -82,9 +112,13 @@ public class C45<A, T, C> {
 		
 		ArrayList<ArrayList<C45Data>> splitData = new ArrayList<ArrayList<C45Data>>();
 		
-		
 		int splitOn = chooseAtrib(data);
-		for (int i = 0; i < atributes.get(splitOn).size(); i++){
+		
+		if (splitOn < 0){
+			return new Node(getConcensus(data));
+		}
+		
+		for (int i = 0; i < attr.get(splitOn).size(); i++){
 			splitData.add(new ArrayList<C45Data>());
 		}
 		Node node = new Node();
@@ -92,12 +126,19 @@ public class C45<A, T, C> {
 		
 		while (data.size()>0){
 			C45Data d = data.remove(0);
-			splitData.get(atributes.get(splitOn).indexOf(d.atributes.get(splitOn))).add(d);
+			A attrib = d.atributes.get(splitOn);
+			ArrayList<A> list = attr.get(splitOn);
+			int i = list.indexOf(attrib);
+			splitData.get(i).add(d);
+			
+			
 			d.atributes.remove(splitOn);
 		}
-		for (int i = 0; i < atributes.get(splitOn).size(); i++){
-			T t = (T) atributes.get(splitOn).get(i);
-			Node tmpNode = addTree(splitData.get(i), aLabels);
+		for (int i = 0; i < attr.get(splitOn).size(); i++){
+			T t = (T) attr.get(splitOn).get(i);
+			ArrayList<ArrayList> a  = (ArrayList<ArrayList>) attr.clone();
+			a.remove(splitOn);
+			Node tmpNode = addTree(splitData.get(i), aLabels, a);
 			node.edges.put( t, tmpNode);
 		}
 		
@@ -129,7 +170,7 @@ public class C45<A, T, C> {
 	private int chooseAtrib(ArrayList<C45Data> data){
 		double baseEntropy = entropy(data);
 		double gain = Double.MAX_VALUE;
-		int best = -1;
+		int best = 0;
 		for (int i = 0; i < atributes.size(); i++){
 			double tmpGain = baseEntropy - entropyOnRow(i, data);
 			if (tmpGain < gain){
@@ -137,7 +178,11 @@ public class C45<A, T, C> {
 				best = i;
 			}
 		}
-		return best;
+		if (gain >= threshold){
+			return best;
+		} else {
+			return -1;
+		}
 	}
 
 	
@@ -189,6 +234,7 @@ public class C45<A, T, C> {
 		public Node() {
 			// TODO Auto-generated constructor stub
 		}
+
 	}
 
 	public class C45Data{
